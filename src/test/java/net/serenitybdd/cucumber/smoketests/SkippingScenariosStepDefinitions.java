@@ -1,10 +1,10 @@
 package net.serenitybdd.cucumber.smoketests;
 
-import cucumber.api.java.After;
-import cucumber.api.java.Before;
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
+import io.cucumber.java.After;
+import io.cucumber.java.Before;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import net.serenitybdd.core.pages.PageObject;
 import net.serenitybdd.core.pages.WebElementFacade;
 import net.thucydides.core.annotations.DefaultUrl;
@@ -86,17 +86,17 @@ public class SkippingScenariosStepDefinitions {
 
     int runningTotal = 0;
 
-    @When("the first number is (.*)")
+    @When("the first number is {int}")
     public void theFirstNumberIs(int n) {
         runningTotal += n;
     }
 
-    @Then("the running total should be (.*)")
+    @Then("the running total should be {int}")
     public void runningTotalIs(int n) {
         assertThat(runningTotal).isEqualTo(n);
     }
 
-    @When("I lookup (.*)")
+    @When("I lookup {}")
     public void whenILookup(String searchTerm) {
         connor.searchesFor(searchTerm);
     }
@@ -105,7 +105,7 @@ public class SkippingScenariosStepDefinitions {
     public void viewHomePage() {
     }
 
-    @Then("I should see \"(.*)\" in the page title")
+    @Then("I should see {} in the page title")
     public void thenIShouldSeeTitle(String title) {
         connor.shouldSeeTitle(title);
     }

@@ -1,12 +1,13 @@
-package cucumber.runtime.formatter;
+package io.cucumber.core.plugin;
 
-import cucumber.api.event.TestSourceRead;
-import gherkin.ast.Feature;
+import io.cucumber.core.internal.gherkin.ast.Feature;
+import io.cucumber.plugin.event.TestSourceRead;
 import net.thucydides.core.util.Inflector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.URI;
 import java.util.Optional;
 
 import static org.apache.commons.lang3.StringUtils.isEmpty;
@@ -17,14 +18,14 @@ public class FeatureFileLoader {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FeatureFileLoader.class);
 
-    private Optional<Feature> featureFrom(String featureFileUri) {
+    private Optional<Feature> featureFrom(URI featureFileUri) {
 
         String defaultFeatureId = new File(featureFileUri).getName().replace(".feature", "");
         String defaultFeatureName = Inflector.getInstance().humanize(defaultFeatureId);
 
         parseGherkinIn(featureFileUri);
 
-        if (isEmpty(testSources.getFeatureName(featureFileUri))) {
+        if (isEmpty(testSources.getFeature(featureFileUri).getName())) {
             return Optional.empty();
         }
 
@@ -35,7 +36,7 @@ public class FeatureFileLoader {
         return Optional.of(feature);
     }
 
-    private void parseGherkinIn(String featureFileUri) {
+    private void parseGherkinIn(URI featureFileUri) {
         try {
             testSources.getFeature(featureFileUri);
         } catch (Throwable ignoreParsingErrors) {
@@ -53,19 +54,19 @@ public class FeatureFileLoader {
                 feature.getChildren());
     }
 
-    public void addTestSourceReadEvent(String path, TestSourceRead event) {
-        testSources.addTestSourceReadEvent(event.uri, event);
+    public void addTestSourceReadEvent(TestSourceRead event) {
+        testSources.addTestSourceReadEvent(event.getUri(), event);
     }
 
-    public String getFeatureName(String featureFileUri) {
-        return testSources.getFeatureName(featureFileUri);
+    public String getFeatureName(URI featureFileUri) {
+        return testSources.getFeature(featureFileUri).getName();
     }
 
-    public Feature getFeature(String featureFileUri) {
+    public Feature getFeature(URI featureFileUri) {
         return testSources.getFeature(featureFileUri);
     }
 
-    TestSourcesModel.AstNode getAstNode(String path, int line) {
+    TestSourcesModel.AstNode getAstNode(URI path, int line) {
         return testSources.getAstNode(path,line);
     }
 }

@@ -1,25 +1,17 @@
 package net.serenitybdd.cucumber.suiteslicing;
 
 import com.google.common.collect.FluentIterable;
-import cucumber.runtime.io.MultiLoader;
-import cucumber.runtime.io.ResourceLoader;
-import cucumber.runtime.model.CucumberFeature;
-import cucumber.runtime.model.FeatureLoader;
-import gherkin.ast.Scenario;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
-import gherkin.ast.Tag;
+import io.cucumber.core.internal.gherkin.ast.*;
+import io.cucumber.core.plugin.FeatureFileLoader;
 import net.serenitybdd.cucumber.util.PathUtils;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.net.URI;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
@@ -33,6 +25,7 @@ public class CucumberScenarioLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(CucumberScenarioLoader.class);
     private final List<URI> featurePaths;
     private final TestStatistics statistics;
+    private Map<Feature, URI> mapsForFeatures = new HashMap<>();
 
     public CucumberScenarioLoader(List<URI> featurePaths, TestStatistics statistics) {
         this.featurePaths = featurePaths;
@@ -41,31 +34,31 @@ public class CucumberScenarioLoader {
 
     public WeightedCucumberScenarios load() {
         LOGGER.debug("Feature paths are {}", featurePaths);
-        ResourceLoader resourceLoader = new MultiLoader(CucumberSuiteSlicer.class.getClassLoader());
-        List<WeightedCucumberScenario> weightedCucumberScenarios = new FeatureLoader(resourceLoader).load(featurePaths).stream()
+        List<WeightedCucumberScenario> weightedCucumberScenarios =
+                featurePaths.stream().map(featurePath->new FeatureFileLoader().getFeature(featurePath))
             .map(getScenarios())
             .flatMap(List::stream)
             .collect(toList());
-
+        featurePaths.stream().collect(Collectors.toMap(f->f, featurePath->new FeatureFileLoader().getFeature(featurePath)));
         return new WeightedCucumberScenarios(weightedCucumberScenarios);
     }
 
-    private Function<CucumberFeature, List<WeightedCucumberScenario>> getScenarios() {
+    private Function<Feature, List<WeightedCucumberScenario>> getScenarios() {
         return cucumberFeature -> {
             try {
-                return (cucumberFeature.getGherkinFeature().getFeature() == null) ? Collections.emptyList() : cucumberFeature.getGherkinFeature().getFeature().getChildren()
+                return (cucumberFeature == null) ? Collections.emptyList() : cucumberFeature.getChildren()
                     .stream()
                     .filter(child -> asList(ScenarioOutline.class, Scenario.class).contains(child.getClass()))
                     .map(scenarioDefinition -> new WeightedCucumberScenario(
-                        PathUtils.getAsFile(cucumberFeature.getUri()).getName(),
-                        cucumberFeature.getGherkinFeature().getFeature().getName(),
+                        PathUtils.getAsFile(mapsForFeatures.get(cucumberFeature)).getName(),
+                        cucumberFeature.getName(),
                         scenarioDefinition.getName(),
                         scenarioWeightFor(cucumberFeature, scenarioDefinition),
                         tagsFor(cucumberFeature, scenarioDefinition),
                         scenarioCountFor(scenarioDefinition)))
                     .collect(toList());
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("Could not extract scenarios from %s", cucumberFeature.getUri()), e);
+                throw new IllegalStateException(String.format("Could not extract scenarios from %s", mapsForFeatures.get(cucumberFeature)), e);
             }
         };
     }
@@ -78,8 +71,8 @@ public class CucumberScenarioLoader {
         }
     }
 
-    private Set<String> tagsFor(CucumberFeature feature, ScenarioDefinition scenarioDefinition) {
-        return FluentIterable.concat(feature.getGherkinFeature().getFeature().getTags(), scenarioTags(scenarioDefinition)).stream().map(Tag::getName).collect(toSet());
+    private Set<String> tagsFor(Feature feature, ScenarioDefinition scenarioDefinition) {
+        return FluentIterable.concat(feature.getTags(), scenarioTags(scenarioDefinition)).stream().map(Tag::getName).collect(toSet());
     }
 
     private List<Tag> scenarioTags(ScenarioDefinition scenario) {
@@ -90,8 +83,8 @@ public class CucumberScenarioLoader {
         }
     }
 
-    private BigDecimal scenarioWeightFor(CucumberFeature feature, ScenarioDefinition scenarioDefinition) {
-        return statistics.scenarioWeightFor(feature.getGherkinFeature().getFeature().getName(), scenarioDefinition.getName());
+    private BigDecimal scenarioWeightFor(Feature feature, ScenarioDefinition scenarioDefinition) {
+        return statistics.scenarioWeightFor(feature.getName(), scenarioDefinition.getName());
     }
 
 }

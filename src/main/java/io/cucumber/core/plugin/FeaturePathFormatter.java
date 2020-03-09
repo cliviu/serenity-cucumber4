@@ -1,9 +1,11 @@
-package cucumber.runtime.formatter;
-
-import net.serenitybdd.cucumber.CucumberWithSerenity;
+package io.cucumber.core.plugin;
 
 import java.net.URI;
-import java.util.*;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class FeaturePathFormatter {
 
@@ -13,23 +15,30 @@ public class FeaturePathFormatter {
         this.lineFilters = LineFilters.forCurrentContext();
     }
 
-    public String featurePathWithPrefixIfNecessary(final String featurePath) {
+    public URI featurePathWithPrefixIfNecessary(final URI featurePath) {
         return lineFilters
                 .getURIForFeaturePath(featurePath)
                 .map(matchingURI -> featurePathWithPrefix(matchingURI, featurePath))
                 .orElse(featurePath);
     }
 
-    private String featurePathWithPrefix(URI featurePathUri, String featurePath) {
+    private URI featurePathWithPrefix(URI featurePathUri, URI featurePath) {
         Set<Integer> allLineNumbersSet = lineFilters.getLineNumbersFor(featurePathUri);
         List<Integer> allLineNumbersList = new ArrayList<>(allLineNumbersSet);
         long featurePathPrefix = allLineNumbersList.get(0);
-        return featurePath + ":" + featurePathPrefix;
+        URI featureURIWithPrefix = featurePathUri;
+        try {
+            featureURIWithPrefix =  new URI(featurePath.toString() + ":" + featurePathPrefix);
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+        return featureURIWithPrefix;
+
     }
 
-    private URI getURIForFeaturePath(Map<URI, Set<Integer>> map, String featurePath) {
+    private URI getURIForFeaturePath(Map<URI, Set<Integer>> map, URI featurePath) {
         for (URI currentURI : map.keySet()) {
-            if (featurePath.equals(currentURI.toString())) {
+            if (featurePath.equals(currentURI)) {
                 return currentURI;
             }
         }

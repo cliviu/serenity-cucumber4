@@ -1,7 +1,7 @@
-package cucumber.runtime.formatter;
+package io.cucumber.core.plugin;
 
-import gherkin.ast.Examples;
-import gherkin.ast.TableRow;
+import io.cucumber.core.internal.gherkin.ast.Examples;
+import io.cucumber.core.internal.gherkin.ast.TableRow;
 import net.serenitybdd.cucumber.CucumberWithSerenity;
 
 import java.net.URI;
@@ -22,9 +22,9 @@ public class LineFilters {
         return new LineFilters();
     }
 
-    public Optional<URI> getURIForFeaturePath(String featurePath) {
+    public Optional<URI> getURIForFeaturePath(URI featurePath) {
         return lineFilters.keySet().stream()
-                .filter(uri -> featurePath.equals(uri.toString()))
+                .filter(uri -> featurePath.equals(uri))
                 .findFirst();
     }
 
@@ -42,7 +42,7 @@ public class LineFilters {
     }
 
 
-    public boolean examplesAreNotExcluded(Examples examples, String featurePath) {
+    public boolean examplesAreNotExcluded(Examples examples, URI featurePath) {
         if (lineFilters.isEmpty()) {
             return true;
         }
@@ -59,7 +59,7 @@ public class LineFilters {
         }
     }
 
-    public boolean tableRowIsNotExcludedBy(TableRow tableRow, String featurePath) {
+    public boolean tableRowIsNotExcludedBy(TableRow tableRow, URI featurePath) {
         if (lineFilters.isEmpty()) {
             return true;
         }
@@ -71,7 +71,7 @@ public class LineFilters {
         }
     }
 
-    private boolean lineFiltersContainFeaturePath(String featurePath) {
+    private boolean lineFiltersContainFeaturePath(URI featurePath) {
         return getURIForFeaturePath(featurePath) != null;
     }
 }

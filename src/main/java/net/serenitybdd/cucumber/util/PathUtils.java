@@ -1,11 +1,11 @@
 package net.serenitybdd.cucumber.util;
 
+import io.cucumber.core.resource.ClasspathSupport;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.util.Objects;
-
-import io.cucumber.core.model.Classpath;
 
 public class PathUtils {
 
@@ -25,7 +25,7 @@ public class PathUtils {
                 }
             }
             case "classpath": {
-                featureFilePath = Classpath.resourceName(cucumberFeatureUri);
+                featureFilePath = ClasspathSupport.resourceName(cucumberFeatureUri);
                 break;
             }
             default:

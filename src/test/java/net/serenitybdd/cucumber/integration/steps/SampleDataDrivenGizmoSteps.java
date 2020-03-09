@@ -1,9 +1,9 @@
 package net.serenitybdd.cucumber.integration.steps;
 
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -115,7 +115,7 @@ public class SampleDataDrivenGizmoSteps {
         List<String> performWithValuesFrom(Map<String, String> exampleData);
     }
 
-    private List<Map<String,String>> mapped(DataTable expectedCost) {
+    private List<Map<String, String>> mapped(DataTable expectedCost) {
         return expectedCost.asMaps(String.class, String.class);
     }
 }

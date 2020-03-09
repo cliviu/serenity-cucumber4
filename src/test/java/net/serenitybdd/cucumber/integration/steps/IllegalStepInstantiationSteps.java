@@ -1,11 +1,13 @@
 package net.serenitybdd.cucumber.integration.steps;
 
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import net.thucydides.core.annotations.Steps;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
 import net.serenitybdd.cucumber.integration.steps.thucydides.SampleSteps;
+import net.thucydides.core.annotations.Steps;
 
-import static org.assertj.core.api.Assertions.assertThat;;
+import static org.assertj.core.api.Assertions.assertThat;
+
+;
 
 /**
  * Created by john on 15/07/2014.

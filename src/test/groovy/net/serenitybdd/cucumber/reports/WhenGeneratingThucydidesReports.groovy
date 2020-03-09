@@ -1,8 +1,8 @@
 package net.serenitybdd.cucumber.reports
 
-import cucumber.api.Result
-import net.serenitybdd.cucumber.integration.SimpleScenario
 import io.cucumber.junit.CucumberRunner
+import io.cucumber.plugin.event.Status
+import net.serenitybdd.cucumber.integration.SimpleScenario
 import net.thucydides.core.reports.OutcomeFormat
 import net.thucydides.core.reports.TestOutcomeLoader
 import org.junit.Rule
@@ -32,7 +32,7 @@ class WhenGeneratingThucydidesReports extends Specification {
         def recordedTestOutcomes = new TestOutcomeLoader().forFormat(OutcomeFormat.JSON).loadFrom(outputDirectory);
 
         then:
-        runtime.exitStatus.results[0].is(Result.Type.PASSED)
+        runtime.exitStatus.results[0].status.is(Status.PASSED)
 
         and:
         !recordedTestOutcomes.isEmpty()

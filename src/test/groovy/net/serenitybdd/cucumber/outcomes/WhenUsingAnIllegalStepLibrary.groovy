@@ -1,8 +1,8 @@
 package net.serenitybdd.cucumber.outcomes
 
+import io.cucumber.junit.CucumberRunner
 import net.serenitybdd.cucumber.integration.BrokenStepLibraryScenario
 import net.serenitybdd.cucumber.integration.IllegalStepLibraryScenario
-import io.cucumber.junit.CucumberRunner
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import spock.lang.Specification
@@ -32,7 +32,7 @@ class WhenUsingAnIllegalStepLibrary extends Specification {
         runtime.exitStatus.results
 
         and:
-        runtime.exitStatus.results[0].errorMessage.contains("this class doesn't have an empty or a page enabled constructor")
+        runtime.exitStatus.results[0].error.getMessage().contains("this class doesn't have an empty or a page enabled constructor")
     }
 
     def "should throw a meaningful exception if a step library if the step library could not be instantiated"() {
@@ -46,7 +46,7 @@ class WhenUsingAnIllegalStepLibrary extends Specification {
         runtime.exitStatus.results
 
         and:
-        runtime.exitStatus.results[0].errorMessage.contains("Failed to instantiate class")
+        runtime.exitStatus.results[0].error.getMessage().contains("Failed to instantiate class")
     }
 
 

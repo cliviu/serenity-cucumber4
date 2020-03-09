@@ -1,7 +1,7 @@
-package cucumber.runtime.formatter;
+package io.cucumber.core.plugin;
 
-import gherkin.ast.Tag;
-import net.serenitybdd.cucumber.util.Splitter;
+
+import io.cucumber.core.internal.gherkin.ast.Tag;
 import net.thucydides.core.util.EnvironmentVariables;
 import org.eclipse.jetty.util.StringUtil;
 import org.jetbrains.annotations.NotNull;

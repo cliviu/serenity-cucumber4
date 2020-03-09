@@ -1,17 +1,19 @@
 package net.serenitybdd.cucumber.integration;
 
-import cucumber.api.TypeRegistry;
-import cucumber.api.TypeRegistryConfigurer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.cucumber.core.api.TypeRegistry;
+import io.cucumber.core.api.TypeRegistryConfigurer;
 import io.cucumber.cucumberexpressions.ParameterByTypeTransformer;
 import io.cucumber.datatable.DataTableType;
 import io.cucumber.datatable.TableCellByTypeTransformer;
 import io.cucumber.datatable.TableEntryByTypeTransformer;
-import io.cucumber.datatable.dependency.com.fasterxml.jackson.databind.ObjectMapper;
 import net.serenitybdd.cucumber.integration.steps.RpnCalculatorStepdefs;
 
 import java.lang.reflect.Type;
 import java.util.Locale;
 import java.util.Map;
+
+//import io.cucumber.datatable.dependency.com.fasterxml.jackson.databind.ObjectMapper;
 
 public class TypeRegistryConfiguration implements TypeRegistryConfigurer {
 
@@ -44,7 +46,7 @@ public class TypeRegistryConfiguration implements TypeRegistryConfigurer {
             return objectMapper.convertValue(s, objectMapper.constructType(type));
         }
 
-        @Override
+        /*@Override
         public <T> T transform(Map<String, String> map, Class<T> aClass, TableCellByTypeTransformer tableCellByTypeTransformer) {
             return objectMapper.convertValue(map, aClass);
         }
@@ -52,6 +54,14 @@ public class TypeRegistryConfiguration implements TypeRegistryConfigurer {
         @Override
         public <T> T transform(String s, Class<T> aClass) {
             return objectMapper.convertValue(s, aClass);
+        }*/
+
+
+
+        @Override
+        public Object transform(Map<String, String> entryValue, Type toValueType, TableCellByTypeTransformer cellTransformer)
+                throws Throwable {
+            return null;
         }
     }
 

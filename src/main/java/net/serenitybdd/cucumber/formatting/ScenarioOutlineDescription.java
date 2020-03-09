@@ -1,9 +1,9 @@
 package net.serenitybdd.cucumber.formatting;
 
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.Step;
-import gherkin.ast.TableCell;
-import gherkin.ast.TableRow;
+import io.cucumber.core.internal.gherkin.ast.ScenarioDefinition;
+import io.cucumber.core.internal.gherkin.ast.Step;
+import io.cucumber.core.internal.gherkin.ast.TableCell;
+import io.cucumber.core.internal.gherkin.ast.TableRow;
 
 import java.util.stream.Collectors;
 
@@ -27,8 +27,8 @@ public class ScenarioOutlineDescription {
     private String stepToString(Step step) {
         String phrase = step.getKeyword() + step.getText();
 
-        if ((step.getArgument() != null) && (step.getArgument().getClass().isAssignableFrom(gherkin.ast.DataTable.class))) {
-            gherkin.ast.DataTable table = (gherkin.ast.DataTable) step.getArgument();
+        if ((step.getArgument() != null) && (step.getArgument().getClass().isAssignableFrom(io.cucumber.core.internal.gherkin.ast.DataTable.class))) {
+            io.cucumber.core.internal.gherkin.ast.DataTable table = (io.cucumber.core.internal.gherkin.ast.DataTable) step.getArgument();
             String tableAsString = "";
             for (TableRow row : table.getRows()) {
                 tableAsString += "|";

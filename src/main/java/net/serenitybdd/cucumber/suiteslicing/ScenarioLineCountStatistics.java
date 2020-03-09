@@ -1,13 +1,7 @@
 package net.serenitybdd.cucumber.suiteslicing;
 
-import cucumber.runtime.io.MultiLoader;
-import cucumber.runtime.io.ResourceLoader;
-import cucumber.runtime.model.CucumberFeature;
-import cucumber.runtime.model.FeatureLoader;
-import gherkin.ast.Background;
-import gherkin.ast.Scenario;
-import gherkin.ast.ScenarioDefinition;
-import gherkin.ast.ScenarioOutline;
+import io.cucumber.core.internal.gherkin.ast.*;
+import io.cucumber.core.plugin.FeatureFileLoader;
 import net.thucydides.core.util.Inflector;
 
 import java.math.BigDecimal;
@@ -26,8 +20,7 @@ public class ScenarioLineCountStatistics implements TestStatistics {
 
     private ScenarioLineCountStatistics(List<URI> featurePaths) {
         this.featurePaths = featurePaths;
-        ResourceLoader resourceLoader = new MultiLoader(CucumberSuiteSlicer.class.getClassLoader());
-        this.results = new FeatureLoader(resourceLoader).load(featurePaths).stream()
+        this.results = featurePaths.stream().map(featurePath->new FeatureFileLoader().getFeature(featurePath))
             .map(featureToScenarios())
             .flatMap(List::stream)
             .collect(toList());
@@ -41,25 +34,25 @@ public class ScenarioLineCountStatistics implements TestStatistics {
         return new ScenarioLineCountStatistics(featurePaths);
     }
 
-    private Function<CucumberFeature, List<TestScenarioResult>> featureToScenarios() {
+    private Function<Feature, List<TestScenarioResult>> featureToScenarios() {
         return cucumberFeature -> {
             try {
-                return (cucumberFeature.getGherkinFeature().getFeature() == null) ? Collections.emptyList() : cucumberFeature.getGherkinFeature().getFeature().getChildren()
+                return (cucumberFeature == null) ? Collections.emptyList() : cucumberFeature.getChildren()
                     .stream()
                     .filter(child -> asList(ScenarioOutline.class, Scenario.class).contains(child.getClass()))
                     .map(scenarioToResult(cucumberFeature))
                     .collect(toList());
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("Could not extract scenarios from %s", cucumberFeature.getUri()), e);
+                throw new IllegalStateException(String.format("Could not extract scenarios from %s", cucumberFeature.getName()), e);
             }
         };
     }
 
-    private Function<ScenarioDefinition, TestScenarioResult> scenarioToResult(CucumberFeature feature) {
+    private Function<ScenarioDefinition, TestScenarioResult> scenarioToResult(Feature feature) {
         return scenarioDefinition -> {
             try {
                 return new TestScenarioResult(
-                    feature.getGherkinFeature().getFeature().getName(),
+                    feature.getName(),
                     scenarioDefinition.getName(),
                     scenarioStepCountFor(backgroundStepCountFor(feature), scenarioDefinition));
             } catch (Exception e) {
@@ -80,8 +73,8 @@ public class ScenarioLineCountStatistics implements TestStatistics {
         return BigDecimal.valueOf(stepCount);
     }
 
-    private int backgroundStepCountFor(CucumberFeature feature) {
-        ScenarioDefinition scenarioDefinition = feature.getGherkinFeature().getFeature().getChildren().get(0);
+    private int backgroundStepCountFor(Feature feature) {
+        ScenarioDefinition scenarioDefinition = feature.getChildren().get(0);
         if (scenarioDefinition instanceof Background) {
             return scenarioDefinition.getSteps().size();
         } else {

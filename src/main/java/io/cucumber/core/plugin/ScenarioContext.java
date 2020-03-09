@@ -1,22 +1,24 @@
-package cucumber.runtime.formatter;
+package io.cucumber.core.plugin;
 
-
-import cucumber.api.TestStep;
-import gherkin.ast.*;
+import io.cucumber.core.internal.gherkin.ast.*;
+import io.cucumber.plugin.event.TestStep;
 import net.thucydides.core.model.DataTable;
 import net.thucydides.core.model.DataTableRow;
 import net.thucydides.core.model.TestTag;
 import net.thucydides.core.steps.StepEventBus;
 import org.jetbrains.annotations.NotNull;
 
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.stream.Collectors.toList;
 
+//import io.cucumber.plugin.event.Step;
+
 class ScenarioContext {
     private final Queue<Step> stepQueue = new LinkedList<>();
-    private final Queue<cucumber.api.TestStep> testStepQueue = new LinkedList<>();
+    private final Queue<TestStep> testStepQueue = new LinkedList<>();
 
     private boolean examplesRunning;
     private boolean addingScenarioOutlineSteps = false;
@@ -40,11 +42,11 @@ class ScenarioContext {
 
     List<Tag> featureTags = new ArrayList<>();
 
-    String currentFeaturePath;
+    URI currentFeaturePath;
 
     private FeaturePathFormatter featurePathFormatter = new FeaturePathFormatter();
 
-    public void currentFeaturePathIs(String featurePath) {
+    public void currentFeaturePathIs(URI featurePath) {
         currentFeaturePath = featurePath;
     }
 
@@ -52,7 +54,7 @@ class ScenarioContext {
         return (ScenarioOutline) currentScenarioDefinition;
     }
 
-    public String currentFeaturePath() {
+    public URI currentFeaturePath() {
         return currentFeaturePath;
     }
 
@@ -226,7 +228,7 @@ class ScenarioContext {
     }
 
     public StepEventBus stepEventBus() {
-        String prefixedPath = featurePathFormatter.featurePathWithPrefixIfNecessary(currentFeaturePath());
+        URI prefixedPath = featurePathFormatter.featurePathWithPrefixIfNecessary(currentFeaturePath());
         return StepEventBus.eventBusFor(prefixedPath);
     }
 }

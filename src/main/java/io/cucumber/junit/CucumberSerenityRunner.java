@@ -1,28 +1,21 @@
 package io.cucumber.junit;
 
-import cucumber.api.Plugin;
-import cucumber.api.StepDefinitionReporter;
-import cucumber.api.event.TestRunFinished;
-import cucumber.api.event.TestRunStarted;
-import cucumber.runner.EventBus;
-import cucumber.runner.ThreadLocalRunnerSupplier;
-import cucumber.runner.TimeService;
-import cucumber.runner.TimeServiceEventBus;
-import cucumber.runtime.*;
-import cucumber.runtime.Runtime;
-import cucumber.runtime.filter.Filters;
-import cucumber.runtime.formatter.PluginFactory;
-import cucumber.runtime.formatter.Plugins;
-import cucumber.runtime.formatter.SerenityReporter;
-import cucumber.runtime.io.MultiLoader;
-import cucumber.runtime.io.ResourceLoader;
-import cucumber.runtime.io.ResourceLoaderClassFinder;
-import io.cucumber.core.options.CucumberOptionsAnnotationParser;
-import io.cucumber.core.options.EnvironmentOptionsParser;
-import io.cucumber.core.options.RuntimeOptions;
-import cucumber.runtime.model.CucumberFeature;
-import cucumber.runtime.model.FeatureLoader;
-import io.cucumber.core.options.RuntimeOptionsBuilder;
+import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.feature.FeatureParser;
+import io.cucumber.core.filter.Filters;
+import io.cucumber.core.gherkin.Feature;
+import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.options.*;
+import io.cucumber.core.plugin.PluginFactory;
+import io.cucumber.core.plugin.Plugins;
+import io.cucumber.core.plugin.SerenityReporter;
+import io.cucumber.core.resource.ClassLoaders;
+import io.cucumber.core.runtime.Runtime;
+import io.cucumber.core.runtime.*;
+import io.cucumber.plugin.Plugin;
+import io.cucumber.plugin.event.TestRunFinished;
+import io.cucumber.plugin.event.TestRunStarted;
+import io.cucumber.plugin.event.TestSourceRead;
 import net.serenitybdd.cucumber.suiteslicing.CucumberSuiteSlicer;
 import net.serenitybdd.cucumber.suiteslicing.ScenarioFilter;
 import net.serenitybdd.cucumber.suiteslicing.TestStatistics;
@@ -44,35 +37,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.time.Clock;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.toList;
-import static net.thucydides.core.ThucydidesSystemProperty.SERENITY_BATCH_COUNT;
-import static net.thucydides.core.ThucydidesSystemProperty.SERENITY_BATCH_NUMBER;
-import static net.thucydides.core.ThucydidesSystemProperty.SERENITY_FORK_COUNT;
-import static net.thucydides.core.ThucydidesSystemProperty.SERENITY_FORK_NUMBER;
+import static net.thucydides.core.ThucydidesSystemProperty.*;
 
 /**
  * Glue code for running Cucumber via Serenity.
  * Sets up Serenity reporting and instrumentation.
  */
-public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
+public class CucumberSerenityRunner extends ParentRunner<ParentRunner<?>> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CucumberSerenityRunner.class);
 
-    private final List<FeatureRunner> children = new ArrayList<FeatureRunner>();
+    private List<ParentRunner<?>> children = new ArrayList<ParentRunner<?>>();
     private final EventBus bus;
-    private final ThreadLocalRunnerSupplier runnerSupplier;
     private static ThreadLocal<RuntimeOptions> RUNTIME_OPTIONS = new ThreadLocal<>();
 
-    private final List<CucumberFeature> features;
+    private final List<Feature> features;
     private final Plugins plugins;
 
     private boolean multiThreadingAssumed = false;
@@ -85,57 +72,86 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
      */
     public CucumberSerenityRunner(Class clazz) throws InitializationError {
         super(clazz);
-        ClassLoader classLoader = clazz.getClassLoader();
-        ResourceLoader resourceLoader = new MultiLoader(classLoader);
         Assertions.assertNoCucumberAnnotatedMethods(clazz);
-        
 
         // Parse the options early to provide fast feedback about invalid options
-        RuntimeOptions annotationOptions = new CucumberOptionsAnnotationParser(resourceLoader)
-                .withOptionsProvider(new JUnitCucumberOptionsProvider())
-                .parse(clazz)
+        RuntimeOptions propertiesFileOptions = new CucumberPropertiesParser()
+                .parse(CucumberProperties.fromPropertiesFile())
                 .build();
 
-        RuntimeOptions runtimeOptions = new EnvironmentOptionsParser(resourceLoader)
-                .parse(Env.INSTANCE)
+        RuntimeOptions annotationOptions = new CucumberOptionsAnnotationParser()
+                .withOptionsProvider(new JUnitCucumberOptionsProvider())
+                .parse(clazz)
+                .build(propertiesFileOptions);
+
+        RuntimeOptions environmentOptions = new CucumberPropertiesParser()
+                .parse(CucumberProperties.fromEnvironment())
                 .build(annotationOptions);
 
-        runtimeOptions.addUndefinedStepsPrinterIfSummaryNotDefined();
+        RuntimeOptions runtimeOptions = new CucumberPropertiesParser()
+                .parse(CucumberProperties.fromSystemProperties())
+                .addDefaultSummaryPrinterIfAbsent()
+                .build(environmentOptions);
+
+        if (!runtimeOptions.isStrict()) {
+            LOGGER.warn("By default Cucumber is running in --non-strict mode.\n" +
+                    "This default will change to --strict and --non-strict will be removed.\n" +
+                    "You can use --strict or @CucumberOptions(strict = true) to suppress this warning"
+            );
+        }
+
+        RuntimeOptionsBuilder runtimeOptionsBuilder =  new RuntimeOptionsBuilder();
+        Collection<String> tagFilters = environmentSpecifiedTags(runtimeOptions.getTagExpressions());
+        for(String tagFilter : tagFilters ) {
+            runtimeOptionsBuilder.addTagFilter(tagFilter);
+        }
+        runtimeOptionsBuilder.build(runtimeOptions);
+
+        // Next parse the junit options
+        JUnitOptions junitPropertiesFileOptions = new JUnitOptionsParser()
+                .parse(CucumberProperties.fromPropertiesFile())
+                .build();
 
         JUnitOptions junitAnnotationOptions = new JUnitOptionsParser()
                 .parse(clazz)
-                .build();
+                .build(junitPropertiesFileOptions);
+
+        JUnitOptions junitEnvironmentOptions = new JUnitOptionsParser()
+                .parse(CucumberProperties.fromEnvironment())
+                .build(junitAnnotationOptions);
 
         JUnitOptions junitOptions = new JUnitOptionsParser()
-                .parse(runtimeOptions.getJunitOptions())
+                .parse(CucumberProperties.fromSystemProperties())
                 .setStrict(runtimeOptions.isStrict())
-                .build(junitAnnotationOptions);
+                .build(junitEnvironmentOptions);
+
+        this.bus = new TimeServiceEventBus(Clock.systemUTC(), UUID::randomUUID);
 
         setRuntimeOptions(runtimeOptions);
 
-        FeatureLoader featureLoader = new FeatureLoader(resourceLoader);
-        FeaturePathFeatureSupplier featureSupplier = new FeaturePathFeatureSupplier(featureLoader, runtimeOptions);
         // Parse the features early. Don't proceed when there are lexer errors
+        FeatureParser parser = new FeatureParser(bus::generateId);
+        Supplier<ClassLoader> classLoader = ClassLoaders::getDefaultClassLoader;
+        FeaturePathFeatureSupplier featureSupplier = new FeaturePathFeatureSupplier(classLoader, runtimeOptions, parser);
         this.features = featureSupplier.get();
 
-        ClassFinder classFinder = new ResourceLoaderClassFinder(resourceLoader, classLoader);
-
-        this.plugins = new Plugins(classLoader, new PluginFactory(),runtimeOptions);
-        this.bus = new TimeServiceEventBus(TimeService.SYSTEM);
+        // Create plugins after feature parsing to avoid the creation of empty files on lexer errors.
+        this.plugins = new Plugins(new PluginFactory(), runtimeOptions);
 
         Configuration systemConfiguration = Injectors.getInjector().getInstance(Configuration.class);
-        SerenityReporter reporter = new SerenityReporter(systemConfiguration, resourceLoader);
+        SerenityReporter reporter = new SerenityReporter(systemConfiguration);
         addSerenityReporterPlugin(plugins,reporter);
 
-        BackendSupplier backendSupplier = new BackendModuleBackendSupplier(resourceLoader, classFinder, runtimeOptions);
-        this.runnerSupplier = new ThreadLocalRunnerSupplier(runtimeOptions, bus, backendSupplier);
-        Filters filters = new Filters(runtimeOptions);
-        for (CucumberFeature cucumberFeature : features) {
-            FeatureRunner featureRunner = new FeatureRunner(cucumberFeature, filters, runnerSupplier, junitOptions);
-            if (!featureRunner.isEmpty()) {
-                children.add(featureRunner);
-            }
-        }
+        ObjectFactoryServiceLoader objectFactoryServiceLoader = new ObjectFactoryServiceLoader(runtimeOptions);
+        ObjectFactorySupplier objectFactorySupplier = new ThreadLocalObjectFactorySupplier(objectFactoryServiceLoader);
+        BackendSupplier backendSupplier = new BackendServiceLoader(clazz::getClassLoader, objectFactorySupplier);
+        TypeRegistryConfigurerSupplier typeRegistryConfigurerSupplier = new ScanningTypeRegistryConfigurerSupplier(classLoader, runtimeOptions);
+        ThreadLocalRunnerSupplier runnerSupplier = new ThreadLocalRunnerSupplier(runtimeOptions, bus, backendSupplier, objectFactorySupplier, typeRegistryConfigurerSupplier);
+        Predicate<Pickle> filters = new Filters(runtimeOptions);
+        children = features.stream()
+                .map(feature -> FeatureRunner.create(feature, filters, runnerSupplier, junitOptions))
+                .filter(runner -> !runner.isEmpty())
+                .collect(toList());
     }
 
     private static RuntimeOptions DEFAULT_RUNTIME_OPTIONS;
@@ -164,22 +180,25 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
         return "@" + tag;
     }
 
-    public static Runtime createSerenityEnabledRuntime(ResourceLoader resourceLoader,
-                                                       ClassLoader classLoader,
+    public static Runtime createSerenityEnabledRuntime(/*ResourceLoader resourceLoader,*/
+                                                       Supplier<ClassLoader> classLoaderSupplier,
                                                        RuntimeOptions runtimeOptions,
                                                        Configuration systemConfiguration) {
-        ClassFinder classFinder = new ResourceLoaderClassFinder(resourceLoader, classLoader);
+        RuntimeOptionsBuilder runtimeOptionsBuilder = new RuntimeOptionsBuilder();
+        Collection<String> allTagFilters = environmentSpecifiedTags(runtimeOptions.getTagExpressions());
+        for(String tagFilter :  allTagFilters) {
+            runtimeOptionsBuilder.addTagFilter(tagFilter);
+        }
+        runtimeOptionsBuilder.build(runtimeOptions);
         setRuntimeOptions(runtimeOptions);
 
-        FeatureLoader featureLoader = new FeatureLoader(resourceLoader);
-        FeaturePathFeatureSupplier featureSupplier = new FeaturePathFeatureSupplier(featureLoader, runtimeOptions);
-        // Parse the features early. Don't proceed when there are lexer errors
-        final List<CucumberFeature> features = featureSupplier.get();
-        EventBus bus = new TimeServiceEventBus(TimeService.SYSTEM);
+
+        EventBus bus = new TimeServiceEventBus(Clock.systemUTC(), UUID::randomUUID);
+        FeatureParser parser = new FeatureParser(bus::generateId);
+        FeaturePathFeatureSupplier featureSupplier = new FeaturePathFeatureSupplier(classLoaderSupplier, runtimeOptions, parser);
         
-        SerenityReporter serenityReporter = new SerenityReporter(systemConfiguration, resourceLoader);
-        Runtime runtime = Runtime.builder().withResourceLoader(resourceLoader).withClassFinder(classFinder).
-                withClassLoader(classLoader).withRuntimeOptions(runtimeOptions).
+        SerenityReporter serenityReporter = new SerenityReporter(systemConfiguration);
+        Runtime runtime = Runtime.builder().withClassLoader(classLoaderSupplier).withRuntimeOptions(runtimeOptions).
                 withAdditionalPlugins(serenityReporter).
                 withEventBus(bus).withFeatureSupplier(featureSupplier).
                 build();
@@ -199,12 +218,12 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
 
 
     @Override
-    protected Description describeChild(FeatureRunner child) {
+    protected Description describeChild(ParentRunner<?> child) {
         return child.getDescription();
     }
 
     @Override
-    protected void runChild(FeatureRunner child, RunNotifier notifier) {
+    protected void runChild(ParentRunner<?> child, RunNotifier notifier) {
         child.run(notifier);
     }
 
@@ -228,15 +247,12 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
             } else {
                 plugins.setEventBusOnEventListenerPlugins(bus);
             }
-
-            bus.send(new TestRunStarted(bus.getTime(), bus.getTimeMillis()));
-            for (CucumberFeature feature : features) {
-                feature.sendTestSourceRead(bus);
+            bus.send(new TestRunStarted(bus.getInstant()));
+            for (Feature feature : features) {
+                bus.send(new TestSourceRead(bus.getInstant(), feature.getUri(), feature.getSource()));
             }
-            StepDefinitionReporter stepDefinitionReporter = plugins.stepDefinitionReporter();
-            runnerSupplier.get().reportStepDefinitions(stepDefinitionReporter);
             runFeatures.evaluate();
-            bus.send(new TestRunFinished(bus.getTime(), bus.getTimeMillis()));
+            bus.send(new TestRunFinished(bus.getInstant()));
         }
     }
 
@@ -246,12 +262,15 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
         multiThreadingAssumed = true;
     }
 
+
+
+
     @Override
-    public List<FeatureRunner> getChildren() {
+    public List<ParentRunner<?>> getChildren() {
         try {
             EnvironmentVariables environmentVariables = Injectors.getInjector().getInstance(EnvironmentVariables.class);
             RuntimeOptions runtimeOptions = currentRuntimeOptions();
-            List<String> tagFilters = runtimeOptions.getTagFilters();
+            List<String> tagFilters = runtimeOptions.getTagExpressions();
             List<URI> featurePaths = runtimeOptions.getFeaturePaths();
             int batchNumber = environmentVariables.getPropertyAsInteger(SERENITY_BATCH_NUMBER, 1);
             int batchCount = environmentVariables.getPropertyAsInteger(SERENITY_BATCH_COUNT, 1);
@@ -265,9 +284,9 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
                 WeightedCucumberScenarios weightedCucumberScenarios = new CucumberSuiteSlicer(featurePaths, TestStatistics.from(environmentVariables, featurePaths))
                     .scenarios(batchNumber, batchCount, forkNumber, forkCount, tagFilters);
 
-                List<FeatureRunner> unfilteredChildren = children;
+                List<ParentRunner<?>> unfilteredChildren = children;
                 AtomicInteger filteredInScenarioCount = new AtomicInteger();
-                List<FeatureRunner> filteredChildren = unfilteredChildren.stream()
+                List<ParentRunner<?>> filteredChildren = unfilteredChildren.stream()
                     .filter(forIncludedFeatures(weightedCucumberScenarios))
                     .map(toPossibleFeatureRunner(weightedCucumberScenarios, filteredInScenarioCount))
                     .filter(Optional::isPresent)
@@ -290,7 +309,7 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
         }
     }
 
-    private Function<FeatureRunner, Optional<FeatureRunner>> toPossibleFeatureRunner(WeightedCucumberScenarios weightedCucumberScenarios, AtomicInteger filteredInScenarioCount) {
+    private Function<ParentRunner<?>, Optional<ParentRunner<?>>> toPossibleFeatureRunner(WeightedCucumberScenarios weightedCucumberScenarios, AtomicInteger filteredInScenarioCount) {
         return featureRunner -> {
             int initialScenarioCount = featureRunner.getDescription().getChildren().size();
             String featureName = FeatureRunnerExtractors.extractFeatureName(featureRunner);
@@ -317,7 +336,7 @@ public class CucumberSerenityRunner extends ParentRunner<FeatureRunner> {
         };
     }
 
-    private Predicate<FeatureRunner> forIncludedFeatures(WeightedCucumberScenarios weightedCucumberScenarios) {
+    private Predicate<ParentRunner<?>> forIncludedFeatures(WeightedCucumberScenarios weightedCucumberScenarios) {
         return featureRunner -> {
             String featureName = FeatureRunnerExtractors.extractFeatureName(featureRunner);
             String featurePath =  PathUtils.getAsFile(FeatureRunnerExtractors.featurePathFor(featureRunner)).getName();

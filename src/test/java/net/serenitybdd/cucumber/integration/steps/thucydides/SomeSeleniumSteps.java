@@ -1,9 +1,8 @@
 package net.serenitybdd.cucumber.integration.steps.thucydides;
 
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
-
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import net.thucydides.core.annotations.Managed;
 import net.thucydides.core.annotations.ManagedPages;
 import net.thucydides.core.annotations.Steps;
@@ -14,7 +13,6 @@ import org.openqa.selenium.WebDriver;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
-import static org.hamcrest.Matchers.is;
 
 public class SomeSeleniumSteps {
 
@@ -76,7 +74,7 @@ public class SomeSeleniumSteps {
         assertThat(page.lastName().getValue(), is($expectedLastname));
     }
 
-    @Then("I should be using (.*)")
+    @Then("I should be using {}")
     public void andIShouldBeUsing(String driverName) {
         assertThat(((WebDriverFacade)webDriver).getDriverClass().getName(), containsString(driverName));
     }
@@ -127,7 +125,7 @@ public class SomeSeleniumSteps {
     }
 
     @Then("^I should see entered values of (.*) and (.*)$")
-    public void i_should_see_entered_values_of_firstName_and_lastName(String expectedFirstName,String expectedLastName) throws Throwable {
+    public void i_should_see_entered_values_of_firstName_and_lastName(String expectedFirstName, String expectedLastName) throws Throwable {
         assertThat(page.firstName().getValue(), is(expectedFirstName));
         assertThat(page.lastName().getValue(), is(expectedLastName));
     }

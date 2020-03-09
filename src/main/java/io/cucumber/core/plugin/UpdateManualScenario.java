@@ -1,6 +1,6 @@
-package cucumber.runtime.formatter;
+package io.cucumber.core.plugin;
 
-import gherkin.ast.Tag;
+import io.cucumber.core.internal.gherkin.ast.Tag;
 import net.thucydides.core.model.TestResult;
 import net.thucydides.core.steps.BaseStepListener;
 import net.thucydides.core.util.EnvironmentVariables;
@@ -15,8 +15,8 @@ public class UpdateManualScenario {
     private String scenarioDescription;
 
     private UpdateManualScenario(BaseStepListener baseStepListener,
-                                EnvironmentVariables environmentVariables,
-                                String scenarioDescription) {
+                                 EnvironmentVariables environmentVariables,
+                                 String scenarioDescription) {
         this.baseStepListener = baseStepListener;
         this.manualScenarioChecker = new ManualScenarioChecker(environmentVariables);
         this.scenarioDescription = scenarioDescription;
@@ -87,7 +87,7 @@ public class UpdateManualScenario {
         }
 
         UpdateManualScenario inContext(BaseStepListener baseStepListener,
-                                              EnvironmentVariables environmentVariables) {
+                                       EnvironmentVariables environmentVariables) {
             return new UpdateManualScenario(baseStepListener, environmentVariables, description);
         }
     }

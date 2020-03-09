@@ -1,11 +1,11 @@
 package net.serenitybdd.cucumber.integration.steps;
 
-import cucumber.api.Scenario;
-import cucumber.api.java.After;
-import cucumber.api.java.Before;
-import cucumber.api.java.en.Given;
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
+import io.cucumber.java.After;
+import io.cucumber.java.Before;
+import io.cucumber.java.Scenario;
+import io.cucumber.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import samples.calculator.RpnCalculator;
 
 import java.util.List;
@@ -70,7 +70,7 @@ public class RpnCalculatorStepdefs {
         Integer second;
         String operation;
 
-        public Entry(Integer first,Integer second, String operation){
+        public Entry(Integer first, Integer second, String operation){
             this.first = first;
             this.second = second;
             this.operation = operation;
